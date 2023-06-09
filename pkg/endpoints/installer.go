@@ -673,7 +673,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		AcceptsGroupVersionDelegate: gvAcceptor,
 
-		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
+		HubGroupVersion: fqKindToRegister.GroupVersion(),
 
 		MetaGroupVersion: metav1.SchemeGroupVersion,
 
