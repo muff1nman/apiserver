@@ -20,12 +20,13 @@ import (
 	"fmt"
 
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apiserver/pkg/server"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 )
 
 type FeatureOptions struct {
@@ -61,7 +62,7 @@ func (o *FeatureOptions) AddFlags(fs *pflag.FlagSet) {
 		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 }
 
-func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interface, informers informers.SharedInformerFactory) error {
+func (o *FeatureOptions) ApplyTo(c *server.Config, kubeAPIServerClientConfig *rest.Config, informers informers.SharedInformerFactory) error {
 	if o == nil {
 		return nil
 	}
@@ -73,11 +74,14 @@ func (o *FeatureOptions) ApplyTo(c *server.Config, clientset kubernetes.Interfac
 	if o.EnablePriorityAndFairness {
 		if c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight <= 0 {
 			return fmt.Errorf("invalid configuration: MaxRequestsInFlight=%d and MaxMutatingRequestsInFlight=%d; they must add up to something positive", c.MaxRequestsInFlight, c.MaxMutatingRequestsInFlight)
-
+		}
+		kubeClient, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
+		if err != nil {
+			return err
 		}
 		c.FlowControl = utilflowcontrol.New(
 			informers,
-			clientset.FlowcontrolV1(),
+			kubeClient.FlowcontrolV1(),
 			c.MaxRequestsInFlight+c.MaxMutatingRequestsInFlight,
 		)
 	}

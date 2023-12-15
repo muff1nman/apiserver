@@ -21,6 +21,9 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -36,9 +39,7 @@ import (
 	apiserverapiv1 "k8s.io/apiserver/pkg/apis/apiserver/v1"
 	apiserverapiv1alpha1 "k8s.io/apiserver/pkg/apis/apiserver/v1alpha1"
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -122,8 +123,7 @@ func (a *AdmissionOptions) AddFlags(fs *pflag.FlagSet) {
 func (a *AdmissionOptions) ApplyTo(
 	c *server.Config,
 	informers informers.SharedInformerFactory,
-	kubeClient kubernetes.Interface,
-	dynamicClient dynamic.Interface,
+	kubeAPIServerClientConfig *rest.Config,
 	features featuregate.FeatureGate,
 	pluginInitializers ...admission.PluginInitializer,
 ) error {
@@ -142,8 +142,16 @@ func (a *AdmissionOptions) ApplyTo(
 	if err != nil {
 		return fmt.Errorf("failed to read plugin config: %v", err)
 	}
+	clientset, err := kubernetes.NewForConfig(kubeAPIServerClientConfig)
+	if err != nil {
+		return err
+	}
+	dynamicClient, err := dynamic.NewForConfig(kubeAPIServerClientConfig)
+	if err != nil {
+		return err
+	}
 
-	genericInitializer := initializer.New(kubeClient, dynamicClient, informers, c.Authorization.Authorizer, features,
+	genericInitializer := initializer.New(clientset, dynamicClient, informers, c.Authorization.Authorizer, features,
 		c.DrainedNotify())
 	initializersChain := admission.PluginInitializers{genericInitializer}
 	initializersChain = append(initializersChain, pluginInitializers...)

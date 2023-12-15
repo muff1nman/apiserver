@@ -23,8 +23,6 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/featuregate"
 )
 
@@ -120,22 +118,14 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 	if err := o.CoreAPI.ApplyTo(config); err != nil {
 		return err
 	}
-	kubeClient, err := kubernetes.NewForConfig(config.ClientConfig)
-	if err != nil {
-		return err
-	}
-	if err := o.Features.ApplyTo(&config.Config, kubeClient, config.SharedInformerFactory); err != nil {
+	if err := o.Features.ApplyTo(&config.Config, config.ClientConfig, config.SharedInformerFactory); err != nil {
 		return err
 	}
 	initializers, err := o.ExtraAdmissionInitializers(config)
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := dynamic.NewForConfig(config.ClientConfig)
-	if err != nil {
-		return err
-	}
-	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, kubeClient, dynamicClient, o.FeatureGate,
+	if err := o.Admission.ApplyTo(&config.Config, config.SharedInformerFactory, config.ClientConfig, o.FeatureGate,
 		initializers...); err != nil {
 		return err
 	}
